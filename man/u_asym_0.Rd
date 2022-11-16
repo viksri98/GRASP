@@ -2,7 +2,7 @@
 % Please edit documentation in R/grasp.R
 \name{u_asym_0}
 \alias{u_asym_0}
-\title{Asymptotic test statistic}
+\title{Asymptotic test statistic (Simple)}
 \usage{
 u_asym_0(VnL, n)
 }

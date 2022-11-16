@@ -2,7 +2,7 @@
 % Please edit documentation in R/grasp.R
 \name{u_finite_0}
 \alias{u_finite_0}
-\title{Finite test statistic}
+\title{Finite test statistic (Simple)}
 \usage{
 u_finite_0(VnL, n)
 }

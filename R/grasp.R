@@ -6,6 +6,7 @@
 #' @param L an integer greater than or equal to 1, default to 50
 #' @export
 fgrasp_statistic <- function(y, model, L=50){
+		# get the number of data points
 		n <- length(y)
 		# Initialize $V_{n,L}$ vector
 		VnL <- rep(0,L)
@@ -31,7 +32,7 @@ fgrasp_statistic <- function(y, model, L=50){
 		return(VnL)
 }
 
-#' Asymptotic test statistic
+#' Asymptotic test statistic (Simple)
 #'
 #' This function will generate the asymptotic test statistic $U_0^{asym}$, with a tolerance of 0.
 #' This is the case covered with detail in the original GRASP paper.
@@ -44,13 +45,12 @@ u_asym_0 <- function(VnL, n){
 		return(u)
 }
 
-#' Finite test statistic
+#' Finite test statistic (Simple)
 #'
 #' This function will generate the finite test statistic $U_0^{finite}$, with a tolerance of 0.
 #' This is the case covered with detail in the original GRASP paper.
 #' @param VnL the output vector of fgrasp_statistic()
 #' @param n the number of datapoints processed to make this statistic
-#' @export
 u_finite_0 <- function(VnL, n){
 		return(u_asym_0(VnL,n)/2)
 }
@@ -88,4 +88,52 @@ hypothesis_kl <- function(eta, eta_hat){
 hypothesis_h <- function(eta, eta_hat){
 		n <- length(eta)
 		return(1/n * sum((sqrt(eta) - sqrt(eta_hat))^2 + (sqrt(1-eta) - sqrt(1-eta_hat))^2))
+}
+
+#' Finite test statistic
+#'
+#' This function will generate the finite test statistic $U_t^{finite}$, using the convex solver CVXR.
+#' If t=0, then call u_finite_0() instead
+#' @import CVXR
+#' @param VnL the output vector of fgrasp_statistic()
+#' @param n the number of data points processed to make this statistic
+#' @param t the tolerance allowed
+#' @param f the convex, continuous function which defines the f-divergence tested
+#' @export
+u_finite <- function(VnL, n, t, f){
+		if(t == 0){
+				return(u_finite_0(VnL, n))
+		}
+		L <- length(VnL)
+		# Create p vector to minimize over
+		p <- Variable(L)
+		objective <- Minimize(1/n * sum( (VnL - n*p)^2 / (p + 1/L)))
+		constraints <- list( p >= 0, sum(p) == 1, 1/L * sum(f(L*p)) <= t)
+		problem <- Problem(objective, constraints)
+		sol <- solve(problem)
+		return(sol$value)
+}
+
+#' Asymptotic test statistic
+#'
+#' This function will generate the asymptotic test statistic $U_t^{asym}$, using the convex solver CVXR.
+#' If t=0, then call u_asym() instead
+#' @import CVXR
+#' @param VnL the output vector of fgrasp_statistic()
+#' @param n the number of data points processed to make this statistic
+#' @param t the tolerance allowed
+#' @param f the convex, continuous function which defines the f-divergence tested
+#' @export
+u_asym <- function(VnL, n, t, f){
+		if(t == 0){
+				return(u_asym_0(VnL, n))
+		}
+		L <- length(VnL)
+		# Create p vector to minimize over
+		p <- Variable(L)
+		objective <- Minimize(1/n * sum( (VnL - n*p)^2 / p ))
+		constraints <- list( p >= 0, sum(p) == 1, 1/L * sum(f(L*p)) <= t)
+		problem <- Problem(objective, constraints)
+		sol <- solve(problem)
+		return(sol$value)
 }
