@@ -51,6 +51,7 @@ u_asym_0 <- function(VnL, n){
 #' This is the case covered with detail in the original GRASP paper.
 #' @param VnL the output vector of fgrasp_statistic()
 #' @param n the number of datapoints processed to make this statistic
+#' @export
 u_finite_0 <- function(VnL, n){
 		return(u_asym_0(VnL,n)/2)
 }
@@ -94,46 +95,101 @@ hypothesis_h <- function(eta, eta_hat){
 #'
 #' This function will generate the finite test statistic $U_t^{finite}$, using the convex solver CVXR.
 #' If t=0, then call u_finite_0() instead
-#' @import CVXR
 #' @param VnL the output vector of fgrasp_statistic()
 #' @param n the number of data points processed to make this statistic
 #' @param t the tolerance allowed
 #' @param f the convex, continuous function which defines the f-divergence tested
-#' @export
 u_finite <- function(VnL, n, t, f){
 		if(t == 0){
 				return(u_finite_0(VnL, n))
 		}
-		L <- length(VnL)
+		#L <- length(VnL)
 		# Create p vector to minimize over
-		p <- Variable(L)
-		objective <- Minimize(1/n * sum( (VnL - n*p)^2 / (p + 1/L)))
-		constraints <- list( p >= 0, sum(p) == 1, 1/L * sum(f(L*p)) <= t)
-		problem <- Problem(objective, constraints)
-		sol <- solve(problem)
-		return(sol$value)
+		#p <- Variable(L)
+		#objective <- Minimize(1/n * sum( (VnL - n*p)^2 / (p + 1/L)))
+		#constraints <- list( p >= 0, sum(p) == 1, 1/L * sum(f(L*p)) <= t)
+		#problem <- Problem(objective, constraints)
+		#sol <- solve(problem)
+		#return(sol$value)
 }
 
 #' Asymptotic test statistic
 #'
 #' This function will generate the asymptotic test statistic $U_t^{asym}$, using the convex solver CVXR.
 #' If t=0, then call u_asym() instead
-#' @import CVXR
 #' @param VnL the output vector of fgrasp_statistic()
 #' @param n the number of data points processed to make this statistic
 #' @param t the tolerance allowed
 #' @param f the convex, continuous function which defines the f-divergence tested
-#' @export
 u_asym <- function(VnL, n, t, f){
 		if(t == 0){
 				return(u_asym_0(VnL, n))
 		}
-		L <- length(VnL)
+		#L <- length(VnL)
 		# Create p vector to minimize over
-		p <- Variable(L)
-		objective <- Minimize(1/n * sum( (VnL - n*p)^2 / p ))
-		constraints <- list( p >= 0, sum(p) == 1, 1/L * sum(f(L*p)) <= t)
-		problem <- Problem(objective, constraints)
-		sol <- solve(problem)
-		return(sol$value)
+		#p <- Variable(L)
+		#objective <- Minimize(1/n * sum( (VnL - n*p)^2 / p ))
+		#constraints <- list( p >= 0, sum(p) == 1, 1/L * sum(f(L*p)) <= t)
+		#problem <- Problem(objective, constraints)
+		#sol <- solve(problem)
+		#return(sol$value)
+}
+
+#' Model-X GRASP statistics
+#'
+#' This function is a variation of fgrasp_statistic() which uses joint variation data in order to construct the statistics VnL.
+#' We assume that the data is distributed over random normal.
+#' @param x a matrix of samples, where rows are samples and columns are features
+#' @param y the vector of labels from the dataset
+#' @param model the model as a function from Chi -> [0,1].
+#' @param score the score function, default to the model-agnostic score function
+#' @param L the number of categories for VnL, default to 50, must be greater than or equal to 2
+#' @export
+xgrasp_statistic <- function(x, y, model, score, L=50){
+		M <- L-1
+		# calculate y_hat
+		y_hat <- apply(x, 1, model)
+		# get the number of data points
+		n <- length(y)
+		# Initialize $V_{n,L}$ vector
+		VnL <- rep(0,L)
+		# Initialize R vector
+		R = rep(0,n)
+		# Initialize labels vector. This will correspond to the label for R[j]
+		labels = rep(0,n)
+		for(j in 1: n){
+				# Set w for each iteration
+				if(y[j] == 1){
+						w <- runif(1,min=0,max=y_hat[j])
+				}else{
+						w <- runif(1,min=y_hat[j],max=1)
+				}
+				# Generate random wtilde
+				w_tilde <- runif(M, 0, 1)
+				# Generate random samples from Px
+				xtilde <- matrix(rep(0, M * L), nrow=M, ncol=L)
+				for(i in 1:M){
+						xtilde[i,] <- rnorm(L, 0, 1)
+				}
+				# Initialize scores vector
+				T <- rep(0, M+1)
+				T[1] <- score(x[j,], w)
+				for(k in 1:M){
+						T[k+1] <- score(xtilde[k,], w_tilde[k])
+				}
+				# Find rank of T[1] in the T array
+				Tj <- T[1]
+				T <- sort(T)
+				R[j] <- which(T == Tj)[[1]]
+				# Find where R[j] fits
+				for(Lj in 1:L){
+						if(Lj-1 <= R[j] & R[j] <= Lj){
+								labels[j] <- Lj
+						}
+				}
+		}
+		for(l in 1:L){
+				VnL[l] <- sum(labels == l)
+		}
+		return(VnL)
 }
