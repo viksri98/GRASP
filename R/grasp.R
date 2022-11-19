@@ -138,8 +138,9 @@ gen_asym <- function(vnl, n){
 #' @param n the number of samples
 #' @export
 gen_finite <- function(vnl, n){
+		L <- length(vnl)
 		u <- function(x){
-				return(1/n * sum((vnl-n*x)^2/(x+1/L)))
+				return(1/n * sum((vnl-n*x)^2/(x+(1/L))))
 		}
 		return(u)
 }
@@ -157,41 +158,53 @@ gen_constraint <- function(L, f){
 		return(con)
 }
 
+#' Positivity
+#'
+#' This function will return true iff every value in the vector p is positive
+#' @param p the vector to test positivity
+positive <- function(p){
+		return(sum(abs(p)) == sum(p))
+}
+
 #' Finite test statistic
 #'
-#' This function will generate the Finite test statistic $U_t^{finite}$, using the solver alabama
+#' This function will generate the Finite test statistic $U_t^{finite}$, using an ROI solver
 #' If t=0, then call u_finite() instead
+#' The optimizer may fail, check for sanity
 #' @import ROI
 #' @import ROI.plugin.alabama
 #' @param VnL the output vector of fgrasp_statistic()
 #' @param n the number of data points processed to make this statistic
 #' @param t the tolerance allowed
 #' @param f the convex, continuous function which defines the f-divergence tested. default to tv
+#' @param solver the ROI solver name, as a string. Default to "alabama"
 #' @export
-u_finite <- function(VnL, n, t, f=tv){
+u_finite <- function(VnL, n, t, f=tv, solver="alabama"){
 		if(t == 0){
-				return(u_finite(VnL, n))
+				return(u_finite_0(VnL, n))
 		}
 		L <- length(VnL)
 		objective <- F_objective(gen_finite(VnL, n), n=L)
 		constraints <- F_constraint(F=list(sum, gen_constraint(L,f)), dir=c("==", "<="), rhs=c(1,t))
 		problem <- OP(objective, constraints)
-		sol <- ROI_solve(problem, solver="alabama", start=rep(1/L, L))
-		return(sol$objval)
+		sol <- ROI_solve(problem, solver=solver, start=rep(1/L, L))
+		return(sol)
 }
 
 #' Asymptotic test statistic
 #'
-#' This function will generate the asymptotic test statistic $U_t^{asym}$, using the solver alabama
+#' This function will generate the asymptotic test statistic $U_t^{asym}$, using an ROI solver
 #' If t=0, then call u_asym() instead
+#' The optimizer may fail, check for sanity before using this result.
 #' @import ROI
 #' @import ROI.plugin.alabama
 #' @param VnL the output vector of fgrasp_statistic()
 #' @param n the number of data points processed to make this statistic
 #' @param t the tolerance allowed
 #' @param f the convex, continuous function which defines the f-divergence tested. default to tv
+#' @param solver the ROI solver name, as a string. Default to "alabama"
 #' @export
-u_asym <- function(VnL, n, t, f=tv){
+u_asym <- function(VnL, n, t, f=tv, solver="alabama"){
 		if(t == 0){
 				return(u_asym_0(VnL, n))
 		}
@@ -199,8 +212,8 @@ u_asym <- function(VnL, n, t, f=tv){
 		objective <- F_objective(gen_asym(VnL, n), n=L)
 		constraints <- F_constraint(F=list(sum, gen_constraint(L,f)), dir=c("==", "<="), rhs=c(1,t))
 		problem <- OP(objective, constraints)
-		sol <- ROI_solve(problem, solver="alabama", start=rep(1/L, L))
-		return(sol$objval)
+		sol <- ROI_solve(problem, solver=solver, start=rep(1/L, L))
+		return(sol)
 }
 
 #' Model-X GRASP statistics
